@@ -1,1 +1,8 @@
+# Input Data
+
+```{r}
+rawdata_twitter <- read.csv ("C:/Users/user/Documents/SEMESTER 5/Metode Peramalan Deret Waktu/Metode-Peramalan-Deret-Waktu/Pertemuan 1/TWITTER.csv")
+data_twitter <- rawdata_twitter[, c("Date", "High")]
+head(data_twitter)
+```
 
