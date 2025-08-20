@@ -1,4 +1,13 @@
-# Input Data
+# Input Data : Twitter Daily Stock Prices 2013-2022
+
+About Dataset
+This dataset contains the daily recorded stock prices (and more) for the company, from day one that they went public.
+
+Twitter, originally founded in 2006, has been publicly-traded since November 2013, when it held an initial public offering that raised $1.8 billion.
+
+Twitter, Inc. operates as a platform for public self-expression and conversation in real-time. The company offers Twitter, a platform that allows users to consume, create, distribute, and discover content.
+
+The company is now in the midst of a battle of take over with Elon Musk for a by out of $46+ billion and since stock prices have soared.
 
 ```{r}
 rawdata_twitter <- read.csv ("C:/Users/user/Documents/SEMESTER 5/Metode Peramalan Deret Waktu/Metode-Peramalan-Deret-Waktu/Pertemuan 1/TWITTER.csv")
