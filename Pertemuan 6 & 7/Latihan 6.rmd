@@ -1,1 +1,320 @@
+---
+title: "Latihan 6"
+author: "Cut Ashifa Sawallida"
+date: "2025-09-30"
+output: html_document
+---
+
+# Pendahuluan
+
+Dalam dokumen ini, kita akan membedah tuntas alur kerja pemodelan ARIMA (*Autoregressive Integrated Moving Average*) dari awal hingga akhir. Tujuannya adalah untuk memahami cara:
+
+1.  **Mengidentifikasi** pola dalam data deret waktu.
+
+2.  **Menentukan** model ARIMA yang paling sesuai.
+
+3.  **Mendiagnosis** kesehatan model yang terpilih.
+
+4.  **Melakukan peramalan** (forecast) untuk melihat ke masa depan.
+
+# Import Library & Data
+
+## Library
+
+```{r}
+library(ggplot2)
+library(tsibble)
+library(tseries)
+library(MASS)
+library(forecast)
+library(TSA)
+library(TTR)
+library(aTSA)
+library(graphics)
+```
+
+## Data
+
+Digunakan data *page loads* dalam *website* yang dalam hal ini hanya digunakan data selama 100 periode
+
+```{r}
+library(readxl)
+datawebsite <- read_excel("C:/Users/user/Documents/Semester 5/Metode Peramalan Deret Waktu/Metode-Peramalan-Deret-Waktu/Pertemuan 1/Page Loads.xlsx")
+
+datawebsite <- datawebsite[301:400, ]
+datawebsite.ts <- ts(datawebsite$PageLoads)
+datawebsite.ts
+```
+
+# Eksplorasi Data
+
+## Plot Data Penuh
+
+```{r}
+plot.ts(datawebsite.ts, lty=1, xlab="Waktu", ylab="Nilai", main="Plot Data Page Loads")
+```
+
+Berdasarkan plot data deret waktu, terlihat bahwa data cenderung memiliki trend yang naik-turun secara fluktuatif. Berdasarkan pola data, pembagian data latih dan data uji ditetapkan dengan proporsi 75%:25%.
+
+## Plot Data Latih
+
+```{r}
+datawebsite.train<-datawebsite.ts[1:75]
+train.ts<-ts(datawebsite.train)
+train.ts
+plot.ts(train.ts, lty=1, xlab="Waktu", ylab="Nilai", main="Plot Page Loads Train")
+```
+
+Berdasarkan plot data deret waktu pada data latih, terlihat bahwa data cenderung memiliki trend yang naik-turun secara fluktuatif stabil dan cenderung bergerak pada nilai tengahnya yaitu 3000. Hal ini mengindikasikan bahwa data stasioner dalam rataan.
+
+## Plot Data Uji
+
+```{r}
+datawebsite.test<-datawebsite.ts[76:100]
+test.ts<-ts(datawebsite.test)
+test.ts
+plot.ts(test.ts, lty=1, xlab="Waktu", ylab="Nilai", main="Plot Page Loads Test")
+```
+
+Berdasarkan plot, terlihat bahwa data tidak cenderung bergerak pada nilai tengah tertentu, maka data kita bisa dikatakan tidak stasioner dalam rataan.
+
+# Uji Stasioneritas Data
+
+## Plot ACF
+
+```{r}
+acf(train.ts)
+```
+
+Berdasarkan plot ACF, terlihat bahwa plot ACF data menurun secara perlahan (*tails of slowly*). Hal ini juga menjadi indikasi bahwa data stasioner dalam rataan
+
+## Uji ADF
+
+```{r, warning=}
+tseries::adf.test(train.ts)
+```
+
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Berdasarkan uji ADF tersebut, didapat *p-value* sebesar 0.01 yang lebih kecil dari taraf nyata 5% sehingga tolak $H_0$ dan menandakan bahwa data stasioner dalam rataan. Hal ini sesuai dengan hasil eksplorasi menggunakan plot time series dan plot ACF.
+
+## Plot Box-Cox
+
+```{r}
+index <- seq(1:75)
+bc = MASS::boxcox(train.ts~index, lambda = seq(-2,4,by=1))
+#Nilai Rounded Lambda
+lambda <- bc$x[which.max(bc$y)]
+lambda
+#SK
+bc$x[bc$y > max(bc$y) - 1/2 * qchisq(.95,1)]
+```
+
+Plot Boxcox menunjukkan nilai *rounded value* ($\lambda$) optimum sebesar **5** dan pada selang kepercayaan 95% nilai memiliki batas bawah **0.90** dan batas atas **2.60**. Selang tersebut memuat nilai satu sehingga dapat dikatakan bahwa data stasioner dalam ragam.
+
+# Identifikasi Model
+
+## Plot ACF
+
+```{r}
+acf(train.ts)
+```
+
+Berdasarkan plot tersebut, terlihat bahwa plot ACF cenderung *cuts off* pada lag ke 1, sehingga jika plot PACF dianggap *tails of*, maka model tentatifnya adalah ARIMA(0,0,1).
+
+## Plot PACF
+
+```{r}
+pacf(train.ts)
+```
+
+Berdasarkan plot tersebut, terlihat bahwa plot PACF cenderung *cuts off* pada lag ke 1, sehingga jika plot ACF dianggap *tails off*, maka model tentatifnya adalah ARIMA(1,0,0).
+
+Jika baik plot ACF maupun plot PACF keduanya dianggap *tails off*, maka model yang terbentuk adalah ARIMA(1,0,1)
+
+## Plot EACF
+
+```{r}
+eacf(train.ts)
+```
+
+Identifikasi model menggunakan plot EACF dilakukan dengan melihat ujung segitiga pada pola segitiga nol. Berdasarkan hasil plot EACF, ujung segitiga nol muncul pada kombinasi ordo (p,q) = (3,2), (4,1), dan (5,2), sehingga dalam hal ini model tentatif yang terbentuk adalah ARIMA(3,0,2), ARIMA(4,0,1), dan ARIMA(5,0,2).
+
+# Pendugaan Parameter Model Tentatif
+
+## ARIMA(3,0,2)
+
+```{r}
+model1.da=Arima(train.ts, order=c(3,0,2),method="ML")
+summary(model1.da)
+lmtest::coeftest(model1.da)
+```
+
+## ARIMA(4,0,1)
+
+```{r}
+model2.da=Arima(train.ts, order=c(4,0,1),method="ML")
+summary(model2.da)
+lmtest::coeftest(model2.da)
+```
+
+## ARIMA(5,0,2)
+
+```{r}
+model3.da=Arima(train.ts, order=c(5,0,2),method="ML")
+summary(model3.da)
+lmtest::coeftest(model3.da)
+```
+
+Berdasarkan pendugaan parameter di atas, didapat nilai AIC masing-masing model adalah sebagai berikut :
+
+-   ARIMA(3,0,2) : 1177.56
+
+-   **ARIMA(4,0,1) : 1169.09**
+
+-   ARIMA(5,0,2) : 1169.83
+
+Didapat AIC terkecil dimiliki oleh model ARIMA(4,0,1) sehingga model yang dipilih adalah model ARIMA(4,0,1), dikarenakan model ini merupakan model paling efisien dengan keseimbangan antara akurasi dan kompleksitas.
+
+# Analisis Sisaan
+
+Model terbaik hasil identifikasi kemudian dicek asumsi sisaannya. Sisaan model ARIMA harus memenuhi asumsi normalitas, kebebasan sisaan, dan kehomogenan ragam. Diagnostik model dilakukan secara eksplorasi dan uji formal.
+
+## Eksplorasi Sisaan
+
+```{r}
+#Eksplorasi 
+sisaan.da <- model2.da$residuals 
+par(mfrow=c(2,2)) 
+qqnorm(sisaan.da) 
+qqline(sisaan.da, col = "blue", lwd = 2) 
+plot(c(1:length(sisaan.da)),sisaan.da) 
+acf(sisaan.da) 
+pacf(sisaan.da) 
+par(mfrow = c(1,1))
+```
+
+Berdasarkan plot kuantil-kuantil normal, secara eksplorasi ditunjukkan sisaan **menyebar normal** ditandai dengan titik-titik yang cenderung mengikuti garis diagonal $45^{\circ}$. Kemudian dapat dilihat juga lebar pita sisaan yang cenderung konstan dan tidak memiliki pola tertentu menandakan bahwa sisaan memiliki **ragam yang homogen** (memenuhi asumsi homoskedastisitas).
+
+Pada plot ACF dan PACF sisaan ARIMA(4,0,1), tampak bahwa sebagian besar nilai autokorelasi dan autokorelasi parsial berada dalam batas kepercayaan (ditandai dengan garis biru putus-putus), sehingga tidak ada lag yang signifikan secara statistik. Hal ini mengindikasikan bahwa **sisaan bersifat acak (white noise)** dan tidak ada pola autokorelasi yang tersisa.
+
+Dengan demikian, secara eksplorasi, model ARIMA(4,0,1) telah memenuhi asumsi dasar model deret waktu, yaitu sisaan berdistribusi normal, homogen, dan saling bebas. Kondisi ini dapat dikonfirmasi lebih lanjut melalui **uji formal.**
+
+## Uji Formal
+
+```{r}
+#1) Sisaan Menyebar Normal 
+shapiro.test(sisaan.da)  #tak tolak H0 > sisaan menyebar normal
+```
+
+Selain dengan eksplorasi, asumsi tersebut dapat diuji menggunakan uji formal. Pada tahapan ini uji formal yang digunakan untuk normalitas adalah uji Shapiro-Wilk. Hipotesis pada ujinya adalah sebagai berikut.
+
+$H_0$ : Sisaan menyebar normal
+
+$H_1$ : Sisaan tidak menyebar normal
+
+Berdasarkan uji tersebut, didapat *p-value* sebesar 0.8582 yang lebih besar dari taraf nyata 5% sehingga tak tolak $H_0$ dan menandakan bahwa sisaan menyebar normal. Hal ini sesuai dengan hasil eksplorasi menggunakan *QQ-plot.*
+
+```{r}
+#2) Sisaan saling bebas/tidak ada autokorelasi 
+Box.test(sisaan.da, type = "Ljung")  #tak tolak H0 > sisaan saling bebas
+```
+
+Selanjutnya akan dilakukan uji formal untuk kebebasan sisaan menggunakan uji Ljung-Box. Hipotesis yang digunakan adalah sebagai berikut.
+
+$H_0$ : Sisaan saling bebas
+
+$H_1$ : Sisaan tidak tidak saling bebas
+
+Berdasarkan uji Ljung-Box tersebut, didapat *p-value* sebesar 0.9661 yang lebih besar dari taraf nyata 5% sehingga tak tolak $H_0$ dan menandakan bahwa sisaan saling bebas. Hal ini sama dengan hasil pada plot eksplorasi sisaan yang sebelumnya dilakukan.
+
+```{r}
+#3) Sisaan homogen 
+Box.test((sisaan.da)^2, type = "Ljung")  #tak tolak H0 > sisaan homogen
+```
+
+Hipotesis yang digunakan untuk uji kehomogenan ragam adalah sebagai berikut.
+
+$H_0$ : Ragam sisaan homogen
+
+$H_1$ : Ragam sisaan tidak homogen
+
+Berdasarkan uji Ljung-Box terhadap sisaan kuadrat tersebut, didapat *p-value* sebesar 0.384 yang lebih besar dari taraf nyata 5% sehingga tak tolak $H_0$ dan menandakan bahwa ragam sisaan homogen. Hasil ini sama dengan hasil eksplorasi sisaan sebelumnya.
+
+```{r}
+#4) Nilai tengah sisaan sama dengan nol 
+t.test(sisaan.da, mu = 0, conf.level = 0.95)  #tak tolak h0 > nilai tengah sisaan sama dengan 0
+```
+
+Terakhir, dengan uji-t, akan dicek apakah nilai tengah sisaan sama dengan nol. Hipotesis yang diujikan sebagai berikut.
+
+$H_0$ : nilai tengah sisaan sama dengan 0
+
+$H_1$ : nilai tengah sisaan tidak sama dengan 0
+
+Berdasarkan uji-t tersebut, didapat *p-value* sebesar 0.8701 yang lebih besar dari taraf nyata 5% sehingga tak tolak $H_0$ dan menandakan bahwa nilai tengah sisaan sama dengan nol. Hal ini sama dengan hasil eksplorasi sisaan sebelumnya.
+
+# Overfitting
+
+Dilanjutkan dengan peramalan model ARIMA terbaik dengan masing2 AR dan MA nilainya ditambah 1.
+
+## ARIMA(5,0,1)
+
+```{r}
+model4.da=Arima(train.ts, order=c(5,0,1),method="ML")
+summary(model4.da)
+lmtest::coeftest(model4.da) 
+```
+
+Kesimpulan :
+
+-   ARIMA(5,0,1) memiliki AIC (1167.93) dan BIC (1186.47) yang lebih rendah dibanding ARIMA(3,1,2) sehingga model tampak lebih baik secara statistik.
+
+-   Semua parameter ARIMA(5,0,1) signifikan tapi jumlahnya banyak, menandakan model lebih kompleks
+
+-   Namun, MA1 ≈ 1.00 dan banyak parameter → tanda **overfitting**: model terlalu menyesuaikan data training.
+
+## ARIMA(4,0,2)
+
+```{r}
+model5.da=Arima(train.ts, order=c(4,0,2),method="ML")
+summary(model5.da)
+lmtest::coeftest(model5.da) 
+```
+
+-   ARIMA(4,0,2) memiliki AIC (1176.09) dan BIC (1194.63) yang lebih tinggi dibanding ARIMA(3,1,2) sehingga model bisa dibilang tidak lebih baik.
+
+-   AR(1) dan AR(2) tidak signifikan pengaruhnya. Ada multikolinearitas antar lag yang membuat sebagian koefisien tidak signifikan.
+
+-   Model ini lebih kompleks tapi performanya turun dibanding (4,0,1) dan (5,0,1).
+
+## Kesimpulan Akhir 
+
+**Model terbaik adalah ARIMA(4,0,1)** karena memiliki risiko *overfitting* paling kecil di antara ketiga model.
+
+# Peramalan
+
+Peramalan dilakukan menggunakan fungsi `forecast()` . Contoh peramalan berikut ini dilakukan untuk 25 hari ke depan.
+
+```{r}
+#---FORECAST---#
+ramalan.da <- forecast::forecast(model2.da, h = 25) 
+ramalan.da
+data.ramalan.da <- ramalan.da$mean
+plot(ramalan.da)
+```
+
+Berdasarkan hasil plot ramalan di atas, dapat dilihat bahwa ramalan ARIMA(4,0,1) cenderung stabil hingga akhir periode. Selanjutnya, dapat dicari nilai akurasi antara hasil ramalan dengan data uji sebagai berikut.
+
+```{r}
+perbandingan.da<-matrix(data=c(head(test.ts, n=25), hasil[-1]),
+                     nrow = 25, ncol = 2)
+colnames(perbandingan.da)<-c("Aktual","Hasil Forecast")
+perbandingan.da
+accuracy(ts(hasil[-1]), head(test.ts, n=25))
+```
+
+Nilai MAPE 26.61372 menunjukkan bahwa model tersebut merupakan model prediksi yang layak.
 
